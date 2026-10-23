@@ -74,6 +74,52 @@ def break_even(cheap, dear):
     return round(dear["price"] / cheap["cost_per_year"], 1)
 
 
+def load_candidates(path):
+    """Read name,price,life_years[,warranty] rows, pointing at the bad line."""
+    import os
+
+    cands = []
+    if not os.path.exists(path):
+        raise SystemExit("%s: no such file" % path)
+    with open(path, newline="") as f:
+        for lineno, row in enumerate(csv.reader(f), start=1):
+            if not row or not any(cell.strip() for cell in row):
+                continue
+            if row[0].strip().startswith("#"):
+                continue
+            if len(row) < 3:
+                raise SystemExit(
+                    "%s:%d: expected 3 columns (name,price,life_years), got %d: %r"
+                    % (path, lineno, len(row), ",".join(row)))
+            nm = row[0].strip()
+            try:
+                pr = float(row[1])
+                lf = float(row[2])
+            except ValueError as exc:
+                raise SystemExit("%s:%d: bad number for %r: %s"
+                                 % (path, lineno, nm, exc)) from None
+            if lf <= 0:
+                raise SystemExit("%s:%d: life_years must be positive, got %r"
+                                 % (path, lineno, row[2]))
+            if pr < 0:
+                raise SystemExit("%s:%d: price must not be negative, got %r"
+                                 % (path, lineno, row[1]))
+            wr = 0.0
+            if len(row) > 3 and row[3].strip():
+                try:
+                    wr = float(row[3])
+                except ValueError as exc:
+                    raise SystemExit("%s:%d: bad warranty value %r: %s"
+                                     % (path, lineno, row[3], exc)) from None
+                if wr < 0:
+                    raise SystemExit("%s:%d: warranty must not be negative, got %r"
+                                     % (path, lineno, row[3]))
+            cands.append((nm, pr, lf, wr))
+    if not cands:
+        raise SystemExit("%s: no candidate rows found" % path)
+    return cands
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="price durability by the decade, not the receipt")
@@ -97,14 +143,7 @@ def main():
 
     cands = []
     if args.file:
-        with open(args.file, newline="") as f:
-            for row in csv.reader(f):
-                if not row or row[0].strip().startswith("#"):
-                    continue
-                nm = row[0].strip()
-                pr, lf = float(row[1]), float(row[2])
-                wr = float(row[3]) if len(row) > 3 and row[3].strip() else 0.0
-                cands.append((nm, pr, lf, wr))
+        cands = load_candidates(args.file)
     else:
         if args.price is None or args.life is None:
             ap.error("need --file or --price/--life")
