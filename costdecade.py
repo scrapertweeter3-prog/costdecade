@@ -95,6 +95,26 @@ def main():
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
+    # CLI numbers get the same sanity checks the CSV path needs: without them
+    # `--life 0` dies with a ZeroDivisionError traceback and a negative
+    # `--price` happily ranks an item at minus dollars.
+    def check_positive(flag, value):
+        if value is not None and value <= 0:
+            ap.error("%s must be positive, got %s" % (flag, value))
+
+    def check_non_negative(flag, value):
+        if value is not None and value < 0:
+            ap.error("%s must not be negative, got %s" % (flag, value))
+
+    check_non_negative("--price", args.price)
+    check_positive("--life", args.life)
+    check_non_negative("--rival-price", args.rival_price)
+    check_positive("--rival-life", args.rival_life)
+    check_positive("--horizon", args.horizon)
+    check_non_negative("--inflation", args.inflation)
+    if not 0 <= args.resale <= 100:
+        ap.error("--resale must be between 0 and 100, got %s" % (args.resale,))
+
     cands = []
     if args.file:
         with open(args.file, newline="") as f:
